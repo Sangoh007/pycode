@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pivot Table App with Faceting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        /* Custom styles for better look and feel */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Very light grey/almost white background */
+            color: #1e293b; /* Dark grey text for readability */
+            padding: 0; /* Remove body padding to allow header/footer to span width */
+            margin: 0; /* Remove body margin */
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto; /* Add margin top/bottom */
+            background-color: #ffffff; /* White container background */
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); /* Lighter shadow */
+        }
+        header, footer {
+            background-color: #3b82f6; /* Blue background for header/footer */
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            font-weight: bold;
+        }
+        header {
+            border-bottom: 2px solid #2563eb; /* Darker blue border */
+            margin-bottom: 20px; /* Space below header */
+        }
+        footer {
+            border-top: 2px solid #2563eb; /* Darker blue border */
+            margin-top: 20px; /* Space above footer */
+        }
+        h1, h2 {
+            color: #1e3a8a; /* Dark blue for titles */
+        }
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #eff6ff; /* Very light blue */
+            border-radius: 8px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #1e3a8a; /* Dark blue label color */
+        }
+        .control-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #93c5fd; /* Medium blue border */
+            border-radius: 4px;
+            background-color: #ffffff; /* White select background */
+            color: #1e293b; /* Dark grey text */
+            height: auto;
+            min-height: 40px; /* Minimum height */
+        }
+        /* Re-added specific height for multi-select */
+        .control-group select[multiple] {
+            min-height: 100px;
+        }
+        .table-container {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #ffffff; /* White table container background */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Lighter shadow */
+            overflow-x: auto; /* Add horizontal scroll for tables */
+        }
+        /* Enhanced Table Styling */
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 10px;
+            border: 1px solid #60a5fa; /* Blue outer border */
+            border-radius: 8px;
+            overflow: hidden;
+            width: auto; /* Allow content to dictate width for scrolling */
+            min-width: 100%; /* Ensure it takes at least 100% if content is small */
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            color: #1e293b; /* Dark grey text */
+            border-bottom: 1px solid #dbeafe; /* Very light blue bottom border */
+            white-space: nowrap;
+        }
+        th {
+            background-color: #60a5fa; /* Blue header background */
+            color: white;
+            font-weight: bold;
+            border-bottom: 2px solid #3b82f6; /* Darker blue bottom border */
+        }
+        td {
+             background-color: #ffffff; /* White background for cells */
+        }
+        tr:nth-child(even) td {
+            background-color: #f1f5f9; /* Light grey for even rows */
+        }
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        th:not(:last-child), td:not(:last-child) {
+            border-right: 1px solid #dbeafe; /* Very light blue right border */
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 15px;
+            gap: 10px;
+        }
+        .pagination-controls button {
+            padding: 8px 15px;
+            background-color: #3b82f6; /* Blue button */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .pagination-controls button:disabled {
+            background-color: #93c5fd; /* Lighter blue when disabled */
+            cursor: not-allowed;
+        }
+        .pagination-controls button:hover:not(:disabled) {
+            background-color: #2563eb; /* Darker blue on hover */
+        }
+        .chart-container {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #ffffff; /* White chart container background */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Lighter shadow */
+        }
+        /* Styling for the chart grid */
+        .chart-grid {
+            display: grid;
+            gap: 20px; /* Space between charts */
+        }
+        .facet-cell {
+            background-color: #ffffff; /* White background for each chart */
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Lighter shadow */
+        }
+        .facet-title {
+            font-size: 1rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #1e3a8a; /* Dark blue facet title color */
+        }
+        .facet-cell canvas {
+            width: 100% !important;
+            height: auto !important; /* Allow height to adjust */
+            max-height: 300px; /* Max height for individual charts */
+        }
+        /* New container styles */
+        .section-container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px; /* Space between sections */
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        made by Sangoh Lim
+    </header>
+
+    <div class="container">
+        <h1 class="text-2xl font-bold mb-6 text-center text-blue-800">Data Pivot and Visualization App</h1>
+
+        <div class="section-container">
+            <h2 class="text-xl font-semibold mb-4 text-blue-700">Filter Controls</h2>
+            <div class="control-panel" id="controlPanel"> <div class="control-group">
+                    <label for="filterColumnSelect">Select Filter Column(s):</label>
+                    <select id="filterColumnSelect" multiple size="4"></select>
+                </div>
+                </div>
+        </div>
+
+        <div class="section-container">
+            <h2 class="text-xl font-semibold mb-4 text-blue-700">Chart Configuration</h2>
+            <div class="control-panel" id="chartControlPanel"> <div class="control-group">
+                    <label for="xAxisSelect">Select X-Axis:</label>
+                    <select id="xAxisSelect"></select>
+                </div>
+                <div class="control-group">
+                    <label for="yAxisSelect">Select Y-Axis:</label>
+                    <select id="yAxisSelect"></select>
+                </div>
+                <div class="control-group">
+                    <label for="colorBySelect">Color By:</label>
+                    <select id="colorBySelect"></select>
+                </div>
+                <div class="control-group">
+                    <label for="facetColSelect">Facet Column:</label>
+                    <select id="facetColSelect"></select>
+                </div>
+                 <div class="control-group">
+                    <label for="facetRowSelect">Facet Row:</label>
+                    <select id="facetRowSelect"></select>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="table-container">
+            <h2 class="text-xl font-semibold mb-4 text-blue-700">Data Table</h2>
+            <div id="dataTable">
+                </div>
+             <div class="pagination-controls">
+                <button id="prevPageBtn">Previous</button>
+                <span id="pageInfo"></span>
+                <button id="nextPageBtn">Next</button>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2 class="text-xl font-semibold mb-4 text-blue-700">Data Chart (Scatter + Line)</h2>
+            <div id="chartGrid" class="chart-grid">
+                 </div>
+        </div>
+    </div>
+
+    <footer>
+        made by Sangoh Lim
+    </footer>
+
+    <script>
+        // Sample Data (replace with your actual data)
+        const rawData = [
+            { date: '2023-01-01', category: 'A', value1: 10, value2: 5, region: 'North' },
+            { date: '2023-01-02', category: 'B', value1: 15, value2: 7, region: 'South' },
+            { date: '2023-01-03', category: 'A', value1: 12, value2: 6, region: 'East' },
+            { date: '2023-01-04', category: 'C', value1: 18, value2: 9, region: 'West' },
+            { date: '2023-01-05', category: 'B', value1: 20, value2: 10, region: 'North' },
+            { date: '2023-01-06', category: 'A', value1: 14, value2: 7, region: 'South' },
+            { date: '2023-01-07', category: 'C', value1: 22, value2: 11, region: 'East' },
+            { date: '2023-01-08', category: 'B', value1: 17, value2: 8, region: 'West' },
+            { date: '2023-01-09', category: 'A', value1: 25, value2: 12, region: 'North' },
+            { date: '2023-01-10', category: 'C', value1: 28, value2: 14, region: 'South' },
+            { date: '2023-01-11', category: 'B', value1: 21, value2: 10.5, region: 'East' },
+            { date: '2023-01-12', category: 'A', value1: 26, value2: 13, region: 'West' },
+            { date: '2023-01-13', category: 'C', value1: 30, value2: 15, region: 'North' },
+            { date: '2023-01-14', category: 'B', value1: 23, value2: 11.5, region: 'South' },
+            { date: '2023-01-15', category: 'A', value1: 28, value2: 14, region: 'East' },
+            { date: '2023-01-16', category: 'B', value1: 32, value2: 16, region: 'North' },
+            { date: '2023-01-17', category: 'C', value1: 35, value2: 17.5, region: 'South' },
+            { date: '2023-01-18', category: 'A', value1: 30, value2: 15, region: 'East' },
+            { date: '2023-01-19', category: 'B', value1: 28, value2: 14, region: 'West' },
+            { date: '2023-01-20', category: 'C', value1: 38, value2: 19, region: 'North' },
+            { date: '2023-01-21', category: 'A', value1: 33, value2: 16.5, region: 'South' },
+            { date: '2023-01-22', category: 'B', value1: 36, value2: 18, region: 'East' },
+            { date: '2023-01-23', category: 'C', value1: 40, value2: 20, region: 'West' },
+            { date: '2023-01-24', category: 'A', value1: 35, value2: 17.5, region: 'North' },
+            { date: '2023-01-25', category: 'B', value1: 38, value2: 19, region: 'South' },
+            { date: '2023-01-26', category: 'C', value1: 42, value2: 21, region: 'East' },
+            { date: '2023-01-27', category: 'A', value1: 37, value2: 18.5, region: 'West' },
+            { date: '2023-01-28', category: 'B', value1: 40, value2: 20, region: 'North' },
+            { date: '2023-01-29', category: 'C', value1: 45, value2: 22.5, region: 'South' },
+            { date: '2023-01-30', category: 'A', value1: 40, value2: 20, region: 'East' },
+        ];
+
+        let currentFilteredData = [...rawData];
+        // Array to hold multiple chart instances for faceting
+        let chartInstances = [];
+
+        // Pagination variables
+        let currentPage = 1;
+        const rowsPerPage = 10;
+
+        // Get unique values for filters
+        function getUniqueValues(data, column) {
+            if (!data || data.length === 0) return [];
+            return [...new Set(data.map(item => item[column]))].sort();
+        }
+
+        // Render filter controls and axis/color selects
+        function renderControls() {
+            console.log("renderControls started");
+            // Get the filter control panel by its ID
+            const filterControlPanel = document.getElementById('controlPanel');
+            // Get the chart control panel by its ID
+            const chartControlPanel = document.getElementById('chartControlPanel');
+
+            if (!rawData || rawData.length === 0) {
+                console.log("rawData is empty, cannot render controls.");
+                return;
+            }
+            const columns = Object.keys(rawData[0]);
+            console.log("Columns found:", columns);
+
+            const filterColumnSelect = document.getElementById('filterColumnSelect');
+            const facetColSelect = document.getElementById('facetColSelect');
+            const facetRowSelect = document.getElementById('facetRowSelect');
+            const xAxisSelect = document.getElementById('xAxisSelect');
+            const yAxisSelect = document.getElementById('yAxisSelect');
+            const colorBySelect = document.getElementById('colorBySelect');
+
+            if (!filterColumnSelect || !facetColSelect || !facetRowSelect || !xAxisSelect || !yAxisSelect || !colorBySelect) {
+                console.error("One or more select elements not found!");
+                return;
+            }
+            console.log("All select elements found.");
+
+
+            // Populate filter column select (multi-select)
+            filterColumnSelect.innerHTML = ''; // Clear existing options
+            // Add "All" option to filter column select
+            const allFilterOption = document.createElement('option');
+            allFilterOption.value = ""; // Use empty value to signify "All"
+            allFilterOption.textContent = "All";
+            filterColumnSelect.appendChild(allFilterOption);
+
+            columns.forEach(col => {
+                // Only add columns with more than one unique value to the filter selection list
+                if (getUniqueValues(rawData, col).length > 1) {
+                    const option = document.createElement('option');
+                    option.value = col;
+                    option.textContent = col;
+                    filterColumnSelect.appendChild(option);
+                }
+            });
+            console.log("Filter column select populated.");
+
+
+            // Populate facet column and row selects (single-select)
+            facetColSelect.innerHTML = ''; // Clear existing options
+            facetRowSelect.innerHTML = ''; // Clear existing options
+
+            // Add "None" option to facet selects
+            const noneColOption = document.createElement('option');
+            noneColOption.value = ""; // Use empty value to signify "None"
+            noneColOption.textContent = "None";
+            facetColSelect.appendChild(noneColOption);
+
+            const noneRowOption = document.createElement('option');
+            noneRowOption.value = ""; // Use empty value to signify "None"
+            noneRowOption.textContent = "None";
+            facetRowSelect.appendChild(noneRowOption);
+
+
+            columns.forEach(col => {
+                const optionCol = document.createElement('option');
+                optionCol.value = col;
+                optionCol.textContent = col;
+                facetColSelect.appendChild(optionCol);
+
+                const optionRow = document.createElement('option');
+                optionRow.value = col;
+                optionRow.textContent = col;
+                facetRowSelect.appendChild(optionRow);
+            });
+            console.log("Facet selects populated.");
+
+
+            // Populate axis and color selects
+            xAxisSelect.innerHTML = ''; // Clear existing options
+            yAxisSelect.innerHTML = ''; // Clear existing options
+            colorBySelect.innerHTML = ''; // Clear existing options
+            columns.forEach(col => {
+                const optionX = document.createElement('option');
+                optionX.value = col;
+                optionX.textContent = col;
+                xAxisSelect.appendChild(optionX);
+
+                const optionY = document.createElement('option');
+                optionY.value = col;
+                optionY.textContent = col;
+                yAxisSelect.appendChild(optionY);
+
+                const optionColor = document.createElement('option');
+                optionColor.value = col;
+                optionColor.textContent = col;
+                colorBySelect.appendChild(optionColor);
+            });
+            console.log("Axis and color selects populated.");
+
+
+            // Set default selections (e.g., first two columns for axes)
+            if (columns.length > 1) {
+                xAxisSelect.value = columns[0];
+                yAxisSelect.value = columns[1];
+                colorBySelect.value = columns[0]; // Default color by first column
+            }
+
+            // Add event listeners to axis/color selects
+            xAxisSelect.addEventListener('change', updateVisualization);
+            yAxisSelect.addEventListener('change', updateVisualization);
+            colorBySelect.addEventListener('change', updateVisualization);
+
+            // Add event listener to the filter column select to update dynamic filters
+            filterColumnSelect.addEventListener('change', updateFilterControls);
+
+            // Add event listeners to facet selects to update visualization
+            facetColSelect.addEventListener('change', updateVisualization);
+            facetRowSelect.addEventListener('change', updateVisualization);
+
+
+            // Add event listeners for pagination buttons
+            document.getElementById('prevPageBtn').addEventListener('click', goToPreviousPage);
+            document.getElementById('nextPageBtn').addEventListener('click', goToNextPage);
+
+            // Initial rendering of dynamic filter controls
+            updateFilterControls();
+            console.log("renderControls finished.");
+        }
+
+        // Update dynamic filter controls based on filterColumnSelect
+        function updateFilterControls() {
+            console.log("updateFilterControls started");
+            // Get the filter control panel by its ID
+            const filterControlPanel = document.getElementById('controlPanel');
+            const filterColumnSelect = document.getElementById('filterColumnSelect');
+            // Filter out the "All" option's empty value when getting selected columns
+            const selectedFilterColumns = Array.from(filterColumnSelect.selectedOptions).map(option => option.value).filter(value => value !== "");
+            console.log("Selected filter columns:", selectedFilterColumns);
+
+
+            // Remove existing dynamic filter controls (those with data-column)
+            filterControlPanel.querySelectorAll('.control-group select[data-column]').forEach(select => {
+                select.parentElement.remove();
+                console.log("Removed dynamic filter for column:", select.dataset.column);
+            });
+
+            // Add new dynamic filter controls for selected columns (now MULTI select)
+            selectedFilterColumns.forEach(col => {
+                const uniqueValues = getUniqueValues(rawData, col);
+                const filterGroup = document.createElement('div');
+                filterGroup.classList.add('control-group');
+                // Added multiple attribute and size="4" back
+                filterGroup.innerHTML = `
+                    <label for="filter-${col}">${col} Filter:</label>
+                    <select id="filter-${col}" data-column="${col}" multiple size="4">
+                         <option value="">All</option> ${uniqueValues.map(value => `<option value="${value}">${value}</option>`).join('')}
+                    </select>
+                `;
+                // Insert the dynamic filter directly into the filter control panel
+                filterControlPanel.appendChild(filterGroup); // Appending to the filter control panel
+                console.log("Added dynamic filter for column:", col);
+
+
+                // Add event listener to the newly created filter select
+                const newFilterSelect = document.getElementById(`filter-${col}`);
+                if (newFilterSelect) {
+                    newFilterSelect.addEventListener('change', () => {
+                        currentPage = 1; // Reset to first page on filter change
+                        updateVisualization();
+                    });
+                    console.log("Added event listener for dynamic filter:", col);
+                } else {
+                    console.error("Could not find the newly created filter select for:", col);
+                }
+            });
+
+            // Update visualization after filter controls are updated
+            updateVisualization();
+            console.log("updateFilterControls finished.");
+        }
+
+
+        // Apply filters based on current selections (handles MULTIPLE selections for dynamic filters)
+        function applyFilters() {
+            console.log("applyFilters started");
+            const filters = {};
+            const filterColumnSelect = document.getElementById('filterColumnSelect');
+            // Get the columns selected in the multi-select filter column dropdown
+            const selectedFilterColumns = Array.from(filterColumnSelect.selectedOptions).map(option => option.value).filter(value => value !== "");
+            console.log("Columns selected for filtering:", selectedFilterColumns);
+
+
+            // Iterate over the columns selected for filtering
+            selectedFilterColumns.forEach(col => {
+                 // Find the corresponding dynamic filter select element
+                const dynamicFilterSelect = document.getElementById(`filter-${col}`);
+                if (dynamicFilterSelect) {
+                    // Get ALL selected options from the dynamic multi-select filter
+                    const selectedOptions = Array.from(dynamicFilterSelect.selectedOptions).map(option => option.value);
+
+                    // Revised logic:
+                    // 1. Check if "All" is selected. If yes, filter = all unique values.
+                    // 2. If "All" is not selected, check if any other options are selected. If yes, filter = selected options.
+                    // 3. If "All" is not selected AND no other options are selected, filter = all unique values (no filter applied).
+
+                    const allOptionSelected = selectedOptions.includes("");
+                    if (allOptionSelected) {
+                        filters[col] = getUniqueValues(rawData, col);
+                        console.log(`Filter for column ${col}: All (explicitly selected)`);
+                    } else if (selectedOptions.length > 0) {
+                        filters[col] = selectedOptions;
+                        console.log(`Filter value for column ${col}:`, filters[col]);
+                    } else {
+                         // If "All" is not selected and no specific values are selected, treat as "All" (no filter)
+                        filters[col] = getUniqueValues(rawData, col);
+                        console.log(`Filter for column ${col}: All (no selection, treated as all)`);
+                    }
+                } else {
+                     console.warn(`Dynamic filter select for column ${col} not found.`);
+                }
+            });
+            console.log("Constructed filters object:", filters);
+
+
+            // Filter the raw data based on the collected filters
+            currentFilteredData = rawData.filter(item => {
+                for (const col in filters) {
+                    // Check if the item's value for the column is included in the selected filter values
+                    // filters[col] will always be an array or undefined.
+                    if (filters[col] && !filters[col].includes(item[col].toString())) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+            console.log("Filtered data count:", currentFilteredData.length);
+            console.log("applyFilters finished.");
+        }
+
+        // Render the data table with pagination
+        function renderTable(data) {
+            console.log("renderTable started");
+            const dataTableDiv = document.getElementById('dataTable');
+            const pageInfoSpan = document.getElementById('pageInfo');
+            const prevPageBtn = document.getElementById('prevPageBtn');
+            const nextPageBtn = document.getElementById('nextPageBtn');
+
+            if (!data || data.length === 0) {
+                dataTableDiv.innerHTML = '<p>No data available.</p>';
+                pageInfoSpan.textContent = '';
+                if(prevPageBtn) prevPageBtn.disabled = true;
+                if(nextPageBtn) nextPageBtn.disabled = true;
+                console.log("renderTable finished: No data.");
+                return;
+            }
+
+            // Calculate start and end index for current page
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = startIndex + rowsPerPage;
+            const paginatedData = data.slice(startIndex, endIndex);
+
+            const columns = Object.keys(data[0]);
+            let tableHTML = '<table><thead><tr>';
+            columns.forEach(col => {
+                tableHTML += `<th>${col}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+
+            paginatedData.forEach(item => {
+                tableHTML += '<tr>';
+                columns.forEach(col => {
+                    tableHTML += `<td>${item[col]}</td>`;
+                });
+                tableHTML += '</tr>';
+            });
+
+            tableHTML += '</tbody></table>';
+            dataTableDiv.innerHTML = tableHTML;
+
+            // Update pagination info and button states
+            const totalPages = Math.ceil(data.length / rowsPerPage);
+            pageInfoSpan.textContent = `Page ${currentPage} / ${totalPages}`;
+
+            if(prevPageBtn) prevPageBtn.disabled = currentPage === 1;
+            if(nextPageBtn) nextPageBtn.disabled = currentPage === totalPages || data.length === 0;
+            console.log("renderTable finished: Data rendered.");
+        }
+
+        // Go to previous page
+        function goToPreviousPage() {
+            console.log("goToPreviousPage clicked");
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable(currentFilteredData); // Re-render table for the new page
+                console.log("Moved to page:", currentPage);
+            }
+        }
+
+        // Go to next page
+        function goToNextPage() {
+            console.log("goToNextPage clicked");
+            const totalPages = Math.ceil(currentFilteredData.length / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTable(currentFilteredData); // Re-render table for the new page
+                console.log("Moved to page:", currentPage);
+            }
+        }
+
+
+        // Define a broader color palette
+        const vibrantColorPalette = [
+            'rgba(255, 99, 132, 1)',  // Red
+            'rgba(54, 162, 235, 1)',  // Blue
+            'rgba(255, 206, 86, 1)',  // Yellow
+            'rgba(75, 192, 192, 1)',  // Green
+            'rgba(153, 102, 255, 1)', // Purple
+            'rgba(255, 159, 64, 1)',  // Orange
+            'rgba(201, 203, 207, 1)', // Grey
+            'rgba(233, 30, 99, 1)',   // Pink
+            'rgba(0, 150, 136, 1)',   // Teal
+            'rgba(103, 58, 183, 1)',  // Deep Purple
+        ];
+
+
+        // Generate colors for points (with transparency)
+        function generateColors(data, colorByColumn) {
+            if (!data || data.length === 0 || !colorByColumn) return [];
+
+            const uniqueValues = getUniqueValues(rawData, colorByColumn); // Use rawData for consistent mapping
+            const colorMap = {};
+            uniqueValues.forEach((value, index) => {
+                const baseColor = vibrantColorPalette[index % vibrantColorPalette.length];
+                // Add transparency to the base color
+                colorMap[value] = baseColor.replace(', 1)', ', 0.8)');
+            });
+
+            return data.map(item => colorMap[item[colorByColumn]]);
+        }
+
+         // Generate border colors map for lines (opaque)
+        function generateBorderColorsMap(colorByColumn) {
+            if (!rawData || rawData.length === 0 || !colorByColumn) return {}; // Use rawData
+
+            const uniqueValues = getUniqueValues(rawData, colorByColumn); // Use rawData for consistent mapping
+            const colorMap = {};
+            uniqueValues.forEach((value, index) => {
+                // Use opaque color directly from the palette
+                colorMap[value] = vibrantColorPalette[index % vibrantColorPalette.length];
+            });
+
+            return colorMap;
+        }
+
+
+        // Render the chart with faceting
+        function renderChart(data, xAxis, yAxis, colorBy) {
+            console.log("renderChart started");
+            const chartGridDiv = document.getElementById('chartGrid');
+
+            // Destroy previous chart instances
+            chartInstances.forEach(instance => instance.destroy());
+            chartInstances = [];
+            chartGridDiv.innerHTML = ''; // Clear the chart grid container
+            console.log("Cleared previous charts.");
+
+
+            if (!data || data.length === 0 || !xAxis || !yAxis) {
+                console.log("No data or axes selected for chart.");
+                return; // No data or axes selected, just clear the chart area
+            }
+
+            const facetColSelect = document.getElementById('facetColSelect');
+            const facetRowSelect = document.getElementById('facetRowSelect');
+            const selectedFacetCol = facetColSelect.value; // Get single selected value
+            const selectedFacetRow = facetRowSelect.value; // Get single selected value
+            console.log("Selected Facet Col:", selectedFacetCol);
+            console.log("Selected Facet Row:", selectedFacetRow);
+
+             // Calculate global min/max for X and Y axes across the entire filtered data
+            let globalXMin = Infinity;
+            let globalXMax = -Infinity;
+            let globalYMin = Infinity;
+            let globalYMax = -Infinity;
+
+            if (data.length > 0) {
+                // Determine the type of the x-axis data
+                const xAxisType = (typeof data[0][xAxis] === 'string' && !isNaN(new Date(data[0][xAxis]))) ? 'time' : 'linear';
+
+                data.forEach(item => {
+                    const xVal = item[xAxis];
+                    const yVal = item[yAxis];
+
+                    // Handle date vs linear for X axis
+                    if (xAxisType === 'time') {
+                         const dateVal = new Date(xVal).getTime(); // Get timestamp for comparison
+                         if (!isNaN(dateVal)) {
+                            globalXMin = Math.min(globalXMin, dateVal);
+                            globalXMax = Math.max(globalXMax, dateVal);
+                         }
+                    } else {
+                         // Assume linear/numerical
+                         if (typeof xVal === 'number' && !isNaN(xVal)) {
+                            globalXMin = Math.min(globalXMin, xVal);
+                            globalXMax = Math.max(globalXMax, xVal);
+                         }
+                    }
+
+
+                    // Handle Y axis (assume linear/numerical for simplicity here)
+                    if (typeof yVal === 'number' && !isNaN(yVal)) {
+                        globalYMin = Math.min(globalYMin, yVal);
+                        globalYMax = Math.max(globalYMax, yVal);
+                    }
+                });
+
+                 // Add some padding to the min/max values for better visualization
+                 if (globalXMin !== Infinity && globalXMax !== -Infinity) {
+                     if (xAxisType === 'time') {
+                         // Add padding in milliseconds (e.g., 1 day)
+                         const padding = 24 * 60 * 60 * 1000;
+                         globalXMin -= padding;
+                         globalXMax += padding;
+                     } else {
+                         // Add 5% padding for linear scales
+                         const xRange = globalXMax - globalXMin;
+                         const padding = xRange * 0.05;
+                         globalXMin -= padding;
+                         globalXMax += padding;
+                     }
+                 }
+
+                if (globalYMin !== Infinity && globalYMax !== -Infinity) {
+                     // Add 5% padding for Y axis
+                     const yRange = globalYMax - globalYMin;
+                     const padding = yRange * 0.05;
+                     globalYMin -= padding;
+                     globalYMax += padding;
+                }
+
+                console.log(`Global X Range: [${globalXMin}, ${globalXMax}]`);
+                console.log(`Global Y Range: [${globalYMin}, ${globalYMax}]`);
+            }
+
+
+            // Determine unique facet combinations
+            let facetCombinations = [{}] // Start with one empty combination for no faceting
+
+            if (selectedFacetCol !== "" || selectedFacetRow !== "") { // Check if "None" is not selected
+                facetCombinations = []; // Reset if faceting is selected
+
+                const uniqueFacetColValues = selectedFacetCol !== ""
+                    ? getUniqueValues(data, selectedFacetCol)
+                    : ['']; // Placeholder if no facet col
+
+                const uniqueFacetRowValues = selectedFacetRow !== ""
+                    ? getUniqueValues(data, selectedFacetRow)
+                    : ['']; // Placeholder if no facet row
+
+                // Create combinations
+                uniqueFacetRowValues.forEach(rowVal => {
+                    uniqueFacetColValues.forEach(colVal => {
+                        const combination = {};
+                        if (selectedFacetRow !== "") combination[selectedFacetRow] = rowVal;
+                        if (selectedFacetCol !== "") combination[selectedFacetCol] = colVal;
+                        facetCombinations.push(combination);
+                    });
+                });
+                console.log("Facet combinations:", facetCombinations);
+
+
+                // Simple grid layout: determine number of columns
+                const numCols = selectedFacetCol !== "" ? uniqueFacetColValues.length : 1;
+                chartGridDiv.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+                console.log("Chart grid columns set to:", numCols);
+
+
+            } else {
+                // No faceting, just one chart
+                chartGridDiv.style.gridTemplateColumns = '1fr';
+                console.log("No faceting, single chart layout.");
+            }
+
+
+            // Generate a color map for unique colorBy values for lines (using all data for consistent colors)
+            const lineColorMap = generateBorderColorsMap(colorBy);
+             // Generate a color map for unique colorBy values for points (using all data for consistent colors)
+            const pointColorMap = generateColors(rawData, colorBy).reduce((map, color, index) => {
+                 map[rawData[index][colorBy]] = color;
+                 return map;
+             }, {});
+            console.log("Color maps generated.");
+
+
+            // Render a chart for each facet combination
+            facetCombinations.forEach(facetCombo => {
+                // Filter data for the current facet combination
+                const facetData = data.filter(item => {
+                    for (const col in facetCombo) {
+                        if (item[col] !== facetCombo[col]) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+                console.log("Data filtered for facet:", facetCombo, "Count:", facetData.length);
+
+
+                const facetCell = document.createElement('div');
+                facetCell.classList.add('facet-cell');
+
+                // Add facet title
+                let facetTitleText = '';
+                for (const col in facetCombo) {
+                    if (facetTitleText) facetTitleText += ' | ';
+                    facetTitleText += `${col}: ${facetCombo[col]}`;
+                }
+                if (!facetTitleText) facetTitleText = 'All Data'; // Title for non-faceted chart
+
+                const facetTitleDiv = document.createElement('div');
+                facetTitleDiv.classList.add('facet-title');
+                facetTitleDiv.textContent = facetTitleText;
+                facetCell.appendChild(facetTitleDiv);
+
+
+                const canvas = document.createElement('canvas');
+                facetCell.appendChild(canvas);
+                chartGridDiv.appendChild(facetCell);
+                console.log("Created facet cell and canvas for:", facetTitleText);
+
+
+                if (facetData.length === 0) {
+                    const noDataMessage = document.createElement('p');
+                    noDataMessage.textContent = 'No data for this facet.';
+                    noDataMessage.style.textAlign = 'center';
+                    noDataMessage.style.color = '#6b7280'; // grey
+                    facetCell.appendChild(noDataMessage);
+                    canvas.style.display = 'none'; // Hide canvas if no data
+                    console.log("No data for facet:", facetTitleText);
+                    return; // Skip chart rendering for this facet
+                }
+
+
+                const ctx = canvas.getContext('2d');
+
+                 // Prepare data for Chart.js for this facet
+                const datasets = [];
+                const uniqueColorByValuesInFacet = getUniqueValues(facetData, colorBy);
+
+                uniqueColorByValuesInFacet.forEach(colorValue => {
+                    const filteredByColor = facetData.filter(item => item[colorBy] === colorValue);
+
+                    // Sort data for lines if x-axis is date or a numerical value
+                    const sortedData = [...filteredByColor].sort((a, b) => {
+                        const aX = a[xAxis];
+                        const bX = b[xAxis];
+                        if (typeof aX === 'string' && !isNaN(new Date(aX))) { // Check if date string
+                             return new Date(aX) - new Date(bX);
+                        }
+                        return aX - bX; // Assume numerical otherwise
+                    });
+
+                    const dataPoints = sortedData.map(item => ({
+                        x: item[xAxis],
+                        y: item[yAxis],
+                    }));
+
+                    // Get colors for points and lines from the pre-generated maps
+                    const groupBorderColor = lineColorMap[colorValue] || 'rgba(54, 162, 235, 1)'; // Fallback
+                    const groupPointColor = pointColorMap[colorValue] || 'rgba(54, 162, 235, 0.8)'; // Fallback
+
+                    datasets.push({
+                        label: colorValue,
+                        data: dataPoints,
+                        borderColor: groupBorderColor, // Use color from map
+                        backgroundColor: groupPointColor, // Use color from map
+                        showLine: true, // Show lines
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        fill: false,
+                        tension: 0.1 // Add some curve to lines
+                    });
+                });
+                console.log("Datasets prepared for facet:", facetTitleText, "Datasets count:", datasets.length);
+
+                 // Determine the type of the x-axis data for this facet (should be consistent with global)
+                const facetXAxisType = (facetData.length > 0 && facetData[0] && typeof facetData[0][xAxis] === 'string' && !isNaN(new Date(facetData[0][xAxis]))) ? 'time' : 'linear';
+
+
+                const newChartInstance = new Chart(ctx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: facetXAxisType, // Use the determined type
+                                title: {
+                                    display: true,
+                                    text: xAxis,
+                                    color: '#075985'
+                                },
+                                ticks: {
+                                    color: '#0369a1'
+                                },
+                                grid: {
+                                    color: '#e0f2f7'
+                                },
+                                min: globalXMin, // Set global min
+                                max: globalXMax  // Set global max
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: yAxis,
+                                    color: '#075985'
+                                },
+                                 ticks: {
+                                    color: '#0369a1'
+                                },
+                                grid: {
+                                    color: '#e0f2f7'
+                                },
+                                min: globalYMin, // Set global min
+                                max: globalYMax  // Set global max
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: uniqueColorByValuesInFacet.length > 1, // Show legend only if coloring by a column with multiple values in this facet
+                                position: 'bottom', // Position legend below the chart
+                                labels: {
+                                    color: '#0369a1'
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        // Format X value based on axis type
+                                        const xValue = (context.chart.scales.x.type === 'time' && context.parsed.x !== null)
+                                            ? new Date(context.parsed.x).toLocaleDateString() // Or use a more specific format
+                                            : context.parsed.x;
+                                        label += `(${xValue}, ${context.parsed.y})`;
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                chartInstances.push(newChartInstance); // Store the instance
+                console.log("Chart instance created for facet:", facetTitleText);
+            });
+            console.log("renderChart finished.");
+        }
+
+        // Update table and chart based on current filters and selections
+        function updateVisualization() {
+            console.log("updateVisualization started");
+            applyFilters();
+            renderTable(currentFilteredData); // Render table with pagination
+            // Chart renders all filtered data, faceted
+            const xAxis = document.getElementById('xAxisSelect').value;
+            const yAxis = document.getElementById('yAxisSelect').value;
+            const colorBy = document.getElementById('colorBySelect').value;
+            renderChart(currentFilteredData, xAxis, yAxis, colorBy);
+            console.log("updateVisualization finished");
+        }
+
+        // Initial render on page load
+        window.onload = function() {
+            console.log("Window loaded. Initializing app.");
+            if (rawData && rawData.length > 0) {
+                console.log("rawData available. Rendering controls.");
+                renderControls();
+                // updateVisualization is called by updateFilterControls initially
+            } else {
+                console.log("No rawData available.");
+                document.getElementById('dataTable').innerHTML = '<p>No data available.</p>';
+                 // Also clear pagination controls if no data
+                const pageInfoSpan = document.getElementById('pageInfo');
+                const prevPageBtn = document.getElementById('prevPageBtn');
+                const nextPageBtn = document.getElementById('nextPageBtn');
+                if(pageInfoSpan) pageInfoSpan.textContent = '';
+                if(prevPageBtn) prevPageBtn.disabled = true;
+                if(nextPageBtn) nextPageBtn.disabled = true;
+
+
+                const chartContainer = document.querySelector('.chart-container');
+                if(chartContainer) {
+                     chartContainer.innerHTML = '<p>No data available.</p>';
+                }
+            }
+            console.log("Window onload finished.");
+        };
+
+    </script>
+
+</body>
+</html>
