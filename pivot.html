@@ -177,6 +177,27 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
             margin-bottom: 20px; /* Space between sections */
         }
+        /* Style for checkbox and number input group */
+        .checkbox-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            min-width: 0; /* Allows the flex container to shrink */
+        }
+        .checkbox-input-group input[type="checkbox"] {
+            width: auto; /* Override full width for checkbox */
+            margin-right: 5px;
+        }
+        .checkbox-input-group input[type="number"] {
+            flex-grow: 1; /* Allow number input to take available space */
+            min-width: 0; /* Crucial: Allows the input to shrink below its content size */
+            padding: 8px;
+            border: 1px solid #93c5fd;
+            border-radius: 4px;
+            background-color: #ffffff;
+            color: #1e293b;
+        }
     </style>
 </head>
 <body>
@@ -212,6 +233,17 @@
                 </div>
         </div>
 
+        <div class="table-container">
+            <h2 class="text-xl font-semibold mb-4 text-blue-700">Data Table</h2>
+            <div id="dataTable">
+                </div>
+             <div class="pagination-controls">
+                <button id="prevPageBtn">Previous</button>
+                <span id="pageInfo"></span>
+                <button id="nextPageBtn">Next</button>
+            </div>
+        </div>
+
         <div class="section-container">
             <h2 class="text-xl font-semibold mb-4 text-blue-700">Chart Configuration</h2>
             <div class="control-panel" id="chartControlPanel"> <div class="control-group">
@@ -234,19 +266,7 @@
                     <label for="facetRowSelect">Facet Row:</label>
                     <select id="facetRowSelect"></select>
                 </div>
-            </div>
-        </div>
-
-
-        <div class="table-container">
-            <h2 class="text-xl font-semibold mb-4 text-blue-700">Data Table</h2>
-            <div id="dataTable">
                 </div>
-             <div class="pagination-controls">
-                <button id="prevPageBtn">Previous</button>
-                <span id="pageInfo"></span>
-                <button id="nextPageBtn">Next</button>
-            </div>
         </div>
 
         <div class="chart-container">
@@ -405,12 +425,15 @@
             const xAxisSelect = document.getElementById('xAxisSelect');
             const yAxisSelect = document.getElementById('yAxisSelect');
             const colorBySelect = document.getElementById('colorBySelect');
+            // const showHorizontalLineCheckbox = document.getElementById('showHorizontalLine'); // Removed
+            // const horizontalLineValueInput = document.getElementById('horizontalLineValue'); // Removed
 
-            if (!filterColumnSelect || !facetColSelect || !facetRowSelect || !xAxisSelect || !yAxisSelect || !colorBySelect) {
-                console.error("One or more select elements not found!");
+
+            if (!filterColumnSelect || !facetColSelect || !facetRowSelect || !xAxisSelect || !yAxisSelect || !colorBySelect) { // Updated check
+                console.error("One or more select/input elements not found!");
                 return;
             }
-            console.log("All select elements found.");
+            console.log("All select/input elements found.");
 
 
             // Populate filter column select (multi-select)
@@ -487,10 +510,16 @@
 
 
             // Set default selections (e.g., first two columns for axes)
-            if (columns.length > 1) {
+            if (columns.length > 0) { // Ensure there's at least one column
                 xAxisSelect.value = columns[0];
-                yAxisSelect.value = columns[1];
+                if (columns.length > 1) { // Ensure there's at least two columns for y-axis
+                    yAxisSelect.value = columns[1];
+                } else {
+                    yAxisSelect.value = columns[0]; // Fallback to first column if only one
+                }
                 colorBySelect.value = columns[0]; // Default color by first column
+            } else {
+                console.warn("No columns available to set default axis selections.");
             }
 
             // Add event listeners to axis/color selects
@@ -504,6 +533,10 @@
             // Add event listeners to facet selects to update visualization
             facetColSelect.addEventListener('change', updateVisualization);
             facetRowSelect.addEventListener('change', updateVisualization);
+
+            // Removed event listeners for horizontal line controls
+            // showHorizontalLineCheckbox.addEventListener('change', updateVisualization);
+            // horizontalLineValueInput.addEventListener('input', updateVisualization);
 
 
             // Add event listeners for pagination buttons
@@ -743,7 +776,7 @@
 
         // Render the chart with faceting
         function renderChart(data, xAxis, yAxis, colorBy) {
-            console.log("renderChart started");
+            console.log("renderChart started with:", { dataLength: data ? data.length : 0, xAxis, yAxis, colorBy });
             const chartGridDiv = document.getElementById('chartGrid');
 
             // Defensive check: Ensure chartGridDiv exists before proceeding
@@ -758,28 +791,37 @@
             chartGridDiv.innerHTML = ''; // Clear the chart grid container
             console.log("Cleared previous charts.");
 
-
-            if (!data || data.length === 0 || !xAxis || !yAxis) {
-                console.log("No data or axes selected for chart.");
-                // Display a message directly in chartGridDiv if no data
-                chartGridDiv.innerHTML = '<p>No data available for chart.</p>';
-                return; // No data or axes selected, just clear the chart area
-            }
-
+            // Get facet selects
             const facetColSelect = document.getElementById('facetColSelect');
             const facetRowSelect = document.getElementById('facetRowSelect');
-            const selectedFacetCol = facetColSelect.value; // Get single selected value
-            const selectedFacetRow = facetRowSelect.value; // Get single selected value
+            // Declare selectedFacetCol and selectedFacetRow at the beginning of the function
+            const selectedFacetCol = facetColSelect ? facetColSelect.value : "";
+            const selectedFacetRow = facetRowSelect ? facetRowSelect.value : "";
+
             console.log("Selected Facet Col:", selectedFacetCol);
             console.log("Selected Facet Row:", selectedFacetRow);
 
-             // Calculate global min/max for X and Y axes across the entire filtered data
+
+            // Removed horizontal line controls state and value access
+            // const showHorizontalLine = document.getElementById('showHorizontalLine').checked;
+            // const horizontalLineValue = parseFloat(document.getElementById('horizontalLineValue').value);
+            // console.log("Horizontal Line Controls - Show:", showHorizontalLine, "Value:", horizontalLineValue);
+
+            // If no data, display no data message and return
+            if (!data || data.length === 0 || !xAxis || xAxis === "" || !yAxis || yAxis === "") {
+                console.log("No data, or axes not selected/invalid. Displaying no data message.");
+                chartGridDiv.innerHTML = '<p>Please load data and select valid X and Y axes to display the chart.</p>';
+                return; // No data or axes selected, just clear the chart area
+            }
+
+
+            // Calculate global min/max for X and Y axes across the entire filtered data
             let globalXMin = Infinity;
             let globalXMax = -Infinity;
             let globalYMin = Infinity;
             let globalYMax = -Infinity;
 
-            if (data.length > 0) {
+            if (data && data.length > 0) { // Only calculate from data if data exists
                 // Determine the type of the x-axis data
                 const xAxisType = (typeof data[0][xAxis] === 'string' && !isNaN(new Date(data[0][xAxis]))) ? 'time' : 'linear';
 
@@ -834,9 +876,26 @@
                      globalYMax += padding;
                 }
 
-                console.log(`Global X Range: [${globalXMin}, ${globalXMax}]`);
-                console.log(`Global Y Range: [${globalYMin}, ${globalYMax}]`);
+                console.log(`Global X Range (from data): [${globalXMin}, ${globalXMax}]`);
+                console.log(`Global Y Range (from data): [${globalYMin}, ${globalYMax}]`);
+            } else {
+                // Fallback for globalXMin/Max if no data points to establish a range
+                globalXMin = 0;
+                globalXMax = 100; // Arbitrary default range for X if no data
+                globalYMin = 0;
+                globalYMax = 100; // Default Y range if no data
+                console.log("No data points: Using default X range and Y range.");
             }
+
+            // Removed Y-axis scale adjustment for horizontal line
+            // if (showHorizontalLine && !isNaN(horizontalLineValue)) {
+            //     const bufferAmount = Math.max(10, Math.abs(horizontalLineValue) * 0.1);
+            //     const targetYMin = horizontalLineValue - bufferAmount;
+            //     const targetYMax = horizontalLineValue + bufferAmount;
+            //     globalYMin = Math.min(globalYMin, targetYMin);
+            //     globalYMax = Math.max(globalYMax, targetYMax);
+            //     console.log(`Adjusted Global Y Range to include horizontal line: [${globalYMin}, ${globalYMax}]`);
+            // }
 
 
             // Determine unique facet combinations
@@ -925,7 +984,7 @@
                 console.log("Created facet cell and canvas for:", facetTitleText);
 
 
-                if (facetData.length === 0) {
+                if (facetData.length === 0) { // Simplified condition
                     const noDataMessage = document.createElement('p');
                     noDataMessage.textContent = 'No data for this facet.';
                     noDataMessage.style.textAlign = 'center';
@@ -941,45 +1000,78 @@
 
                  // Prepare data for Chart.js for this facet
                 const datasets = [];
-                const uniqueColorByValuesInFacet = getUniqueValues(facetData, colorBy);
+                // Only add data points if facetData exists
+                if (facetData.length > 0) {
+                    const uniqueColorByValuesInFacet = getUniqueValues(facetData, colorBy);
 
-                uniqueColorByValuesInFacet.forEach(colorValue => {
-                    const filteredByColor = facetData.filter(item => item[colorBy] === colorValue);
+                    uniqueColorByValuesInFacet.forEach(colorValue => {
+                        const filteredByColor = facetData.filter(item => item[colorBy] === colorValue);
 
-                    // Sort data for lines if x-axis is date or a numerical value
-                    const sortedData = [...filteredByColor].sort((a, b) => {
-                        const aX = a[xAxis];
-                        const bX = b[xAxis];
-                        if (typeof aX === 'string' && !isNaN(new Date(aX))) { // Check if date string
-                             return new Date(aX) - new Date(bX);
-                        }
-                        return aX - bX; // Assume numerical otherwise
+                        // Sort data for lines if x-axis is date or a numerical value
+                        const sortedData = [...filteredByColor].sort((a, b) => {
+                            const aX = a[xAxis];
+                            const bX = b[xAxis];
+                            if (typeof aX === 'string' && !isNaN(new Date(aX))) { // Check if date string
+                                 return new Date(aX) - new Date(bX);
+                            }
+                            return aX - bX; // Assume numerical otherwise
+                        });
+
+                        const dataPoints = sortedData.map(item => ({
+                            x: item[xAxis],
+                            y: item[yAxis],
+                        }));
+
+                        // Get colors for points and lines from the pre-generated maps
+                        const groupBorderColor = lineColorMap[colorValue] || 'rgba(54, 162, 235, 1)'; // Fallback
+                        const groupPointColor = pointColorMap[colorValue] || 'rgba(54, 162, 235, 0.8)'; // Fallback
+
+                        datasets.push({
+                            label: colorValue,
+                            data: dataPoints,
+                            borderColor: groupBorderColor, // Use color from map
+                            backgroundColor: groupPointColor, // Use color from map
+                            showLine: true, // Show lines
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            fill: false,
+                            tension: 0.1 // Add some curve to lines
+                        });
                     });
+                    console.log("Datasets prepared for facet:", facetTitleText, "Datasets count:", datasets.length);
+                } else {
+                    console.log("No facet data points for this chart."); // Updated log message
+                }
 
-                    const dataPoints = sortedData.map(item => ({
-                        x: item[xAxis],
-                        y: item[yAxis],
-                    }));
 
-                    // Get colors for points and lines from the pre-generated maps
-                    const groupBorderColor = lineColorMap[colorValue] || 'rgba(54, 162, 235, 1)'; // Fallback
-                    const groupPointColor = pointColorMap[colorValue] || 'rgba(54, 162, 235, 0.8)'; // Fallback
+                // Removed horizontal line dataset addition
+                // if (showHorizontalLine && !isNaN(horizontalLineValue)) {
+                //     const lineData = [
+                //         { x: globalXMin, y: horizontalLineValue },
+                //         { x: globalXMax, y: horizontalLineValue }
+                //     ];
+                //     if (isFinite(globalXMin) && isFinite(globalXMax)) {
+                //         datasets.push({
+                //             label: `Horizontal Line (${horizontalLineValue})`,
+                //             data: lineData,
+                //             borderColor: 'rgba(255, 0, 255, 1)',
+                //             borderDash: [5, 5],
+                //             borderWidth: 8,
+                //             pointRadius: 0,
+                //             fill: false,
+                //             tension: 0
+                //         });
+                //         console.log("Horizontal line dataset ADDED. Value:", horizontalLineValue, "X range:", globalXMin, globalXMax);
+                //     } else {
+                //         console.warn("Horizontal line NOT ADDED for facet:", facetTitleText, "due to invalid global X range:", globalXMin, globalXMax);
+                //     }
+                // } else {
+                //     console.log("Horizontal line NOT ADDED for facet:", facetTitleText, ": Checkbox not checked or value is NaN.");
+                // }
 
-                    datasets.push({
-                        label: colorValue,
-                        data: dataPoints,
-                        borderColor: groupBorderColor, // Use color from map
-                        backgroundColor: groupPointColor, // Use color from map
-                        showLine: true, // Show lines
-                        pointRadius: 5,
-                        pointHoverRadius: 7,
-                        fill: false,
-                        tension: 0.1 // Add some curve to lines
-                    });
-                });
-                console.log("Datasets prepared for facet:", facetTitleText, "Datasets count:", datasets.length);
 
                  // Determine the type of the x-axis data for this facet (should be consistent with global)
+                // If no data, default to 'linear' for the axis type.
                 const facetXAxisType = (facetData.length > 0 && facetData[0] && typeof facetData[0][xAxis] === 'string' && !isNaN(new Date(facetData[0][xAxis]))) ? 'time' : 'linear';
 
 
@@ -1026,7 +1118,7 @@
                         },
                         plugins: {
                             legend: {
-                                display: uniqueColorByValuesInFacet.length > 1, // Show legend only if coloring by a column with multiple values in this facet
+                                display: datasets.length > 0, // Show legend if there's any dataset (data points or horizontal line)
                                 position: 'bottom', // Position legend below the chart
                                 labels: {
                                     color: '#0369a1'
