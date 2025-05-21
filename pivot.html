@@ -189,6 +189,21 @@
         <h1 class="text-2xl font-bold mb-6 text-center text-blue-800">Data Pivot and Visualization App</h1>
 
         <div class="section-container">
+            <h2 class="text-xl font-semibold mb-4 text-blue-700">Data Loading</h2>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label for="tsvFileInput" class="block mb-2 text-sm font-medium text-gray-900">Load TSV File:</label>
+                    <input type="file" id="tsvFileInput" accept=".tsv, .txt" class="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-container">
             <h2 class="text-xl font-semibold mb-4 text-blue-700">Filter Controls</h2>
             <div class="control-panel" id="controlPanel"> <div class="control-group">
                     <label for="filterColumnSelect">Select Filter Column(s):</label>
@@ -246,39 +261,8 @@
     </footer>
 
     <script>
-        // Sample Data (replace with your actual data)
-        const rawData = [
-            { date: '2023-01-01', category: 'A', value1: 10, value2: 5, region: 'North' },
-            { date: '2023-01-02', category: 'B', value1: 15, value2: 7, region: 'South' },
-            { date: '2023-01-03', category: 'A', value1: 12, value2: 6, region: 'East' },
-            { date: '2023-01-04', category: 'C', value1: 18, value2: 9, region: 'West' },
-            { date: '2023-01-05', category: 'B', value1: 20, value2: 10, region: 'North' },
-            { date: '2023-01-06', category: 'A', value1: 14, value2: 7, region: 'South' },
-            { date: '2023-01-07', category: 'C', value1: 22, value2: 11, region: 'East' },
-            { date: '2023-01-08', category: 'B', value1: 17, value2: 8, region: 'West' },
-            { date: '2023-01-09', category: 'A', value1: 25, value2: 12, region: 'North' },
-            { date: '2023-01-10', category: 'C', value1: 28, value2: 14, region: 'South' },
-            { date: '2023-01-11', category: 'B', value1: 21, value2: 10.5, region: 'East' },
-            { date: '2023-01-12', category: 'A', value1: 26, value2: 13, region: 'West' },
-            { date: '2023-01-13', category: 'C', value1: 30, value2: 15, region: 'North' },
-            { date: '2023-01-14', category: 'B', value1: 23, value2: 11.5, region: 'South' },
-            { date: '2023-01-15', category: 'A', value1: 28, value2: 14, region: 'East' },
-            { date: '2023-01-16', category: 'B', value1: 32, value2: 16, region: 'North' },
-            { date: '2023-01-17', category: 'C', value1: 35, value2: 17.5, region: 'South' },
-            { date: '2023-01-18', category: 'A', value1: 30, value2: 15, region: 'East' },
-            { date: '2023-01-19', category: 'B', value1: 28, value2: 14, region: 'West' },
-            { date: '2023-01-20', category: 'C', value1: 38, value2: 19, region: 'North' },
-            { date: '2023-01-21', category: 'A', value1: 33, value2: 16.5, region: 'South' },
-            { date: '2023-01-22', category: 'B', value1: 36, value2: 18, region: 'East' },
-            { date: '2023-01-23', category: 'C', value1: 40, value2: 20, region: 'West' },
-            { date: '2023-01-24', category: 'A', value1: 35, value2: 17.5, region: 'North' },
-            { date: '2023-01-25', category: 'B', value1: 38, value2: 19, region: 'South' },
-            { date: '2023-01-26', category: 'C', value1: 42, value2: 21, region: 'East' },
-            { date: '2023-01-27', category: 'A', value1: 37, value2: 18.5, region: 'West' },
-            { date: '2023-01-28', category: 'B', value1: 40, value2: 20, region: 'North' },
-            { date: '2023-01-29', category: 'C', value1: 45, value2: 22.5, region: 'South' },
-            { date: '2023-01-30', category: 'A', value1: 40, value2: 20, region: 'East' },
-        ];
+        // Initial rawData will be empty, or just a small sample to show structure
+        let rawData = []; // Start with empty data
 
         let currentFilteredData = [...rawData];
         // Array to hold multiple chart instances for faceting
@@ -294,6 +278,102 @@
             return [...new Set(data.map(item => item[column]))].sort();
         }
 
+        // Function to load TSV file
+        function loadTsvFile(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                console.log("No file selected.");
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const text = e.target.result;
+                console.log("File content read. Attempting to parse TSV.");
+                try {
+                    const parsedData = parseTsv(text);
+                    console.log("TSV parsing complete. Parsed data length:", parsedData.length);
+                    if (parsedData.length > 0) {
+                        rawData = parsedData; // Update global rawData
+                        currentPage = 1; // Reset pagination
+                        console.log("Calling renderControls().");
+                        renderControls(); // Re-render controls with new columns
+                        console.log("Calling updateVisualization().");
+                        updateVisualization(); // Update table and charts
+                        console.log("TSV data loaded successfully.");
+                    } else {
+                        console.warn("TSV file parsed but contains no data rows.");
+                        document.getElementById('dataTable').innerHTML = '<p>No data available from TSV file.</p>';
+                        // Modified: Target chartGridDiv directly instead of chartContainer
+                        const chartGridDiv = document.getElementById('chartGrid');
+                        if(chartGridDiv) {
+                            chartGridDiv.innerHTML = '<p>No data available.</p>';
+                        }
+                         // Also clear pagination controls if no data
+                        const pageInfoSpan = document.getElementById('pageInfo');
+                        const prevPageBtn = document.getElementById('prevPageBtn');
+                        const nextPageBtn = document.getElementById('nextPageBtn');
+                        if(pageInfoSpan) pageInfoSpan.textContent = '';
+                        if(prevPageBtn) prevPageBtn.disabled = true;
+                        if(nextPageBtn) nextPageBtn.disabled = true;
+                    }
+                } catch (error) {
+                    // Log the actual error object for detailed debugging
+                    console.error("Error loading TSV file:", error);
+                    document.getElementById('dataTable').innerHTML = '<p>Error loading TSV file. Please check console for details.</p>';
+                    // Modified: Target chartGridDiv directly instead of chartContainer
+                    const chartGridDiv = document.getElementById('chartGrid');
+                    if(chartGridDiv) {
+                        chartGridDiv.innerHTML = '<p>Error loading TSV file.</p>';
+                    }
+                }
+            };
+
+            reader.onerror = function(e) {
+                console.error("Error reading file:", e.target.error);
+                document.getElementById('dataTable').innerHTML = '<p>Error reading file. Please try again.</p>';
+                // Modified: Target chartGridDiv directly instead of chartContainer
+                const chartGridDiv = document.getElementById('chartGrid');
+                if(chartGridDiv) {
+                    chartGridDiv.innerHTML = '<p>Error reading file.</p>';
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        // Function to parse TSV string into an array of objects
+        function parseTsv(tsvString) {
+            const lines = tsvString.trim().split('\n');
+            if (lines.length === 0) return [];
+
+            const headers = lines[0].split('\t').map(h => h.trim());
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split('\t').map(v => v.trim());
+                if (values.length !== headers.length) {
+                    console.warn(`Skipping row ${i + 1} due to column mismatch. Line: "${lines[i]}"`); // Added line content for warning
+                    continue;
+                }
+                const rowObject = {};
+                headers.forEach((header, index) => {
+                    let value = values[index];
+                    // Attempt to convert to number if possible
+                    if (!isNaN(Number(value)) && value.trim() !== '') {
+                        rowObject[header] = Number(value);
+                    } else {
+                        rowObject[header] = value;
+                    }
+                });
+                data.push(rowObject);
+                console.log(`Parsed row ${i}:`, rowObject); // Log each parsed row
+            }
+            return data;
+        }
+
+
         // Render filter controls and axis/color selects
         function renderControls() {
             console.log("renderControls started");
@@ -304,6 +384,16 @@
 
             if (!rawData || rawData.length === 0) {
                 console.log("rawData is empty, cannot render controls.");
+                // Clear all selects if no data
+                document.getElementById('filterColumnSelect').innerHTML = '';
+                document.getElementById('facetColSelect').innerHTML = '';
+                document.getElementById('facetRowSelect').innerHTML = '';
+                document.getElementById('xAxisSelect').innerHTML = '';
+                document.getElementById('yAxisSelect').innerHTML = '';
+                document.getElementById('colorBySelect').innerHTML = '';
+                filterControlPanel.querySelectorAll('.control-group select[data-column]').forEach(select => {
+                    select.parentElement.remove();
+                });
                 return;
             }
             const columns = Object.keys(rawData[0]);
@@ -656,6 +746,12 @@
             console.log("renderChart started");
             const chartGridDiv = document.getElementById('chartGrid');
 
+            // Defensive check: Ensure chartGridDiv exists before proceeding
+            if (!chartGridDiv) {
+                console.error("Error: 'chartGrid' element not found in the DOM. Cannot render chart.");
+                return; // Exit if the container is not found
+            }
+
             // Destroy previous chart instances
             chartInstances.forEach(instance => instance.destroy());
             chartInstances = [];
@@ -665,6 +761,8 @@
 
             if (!data || data.length === 0 || !xAxis || !yAxis) {
                 console.log("No data or axes selected for chart.");
+                // Display a message directly in chartGridDiv if no data
+                chartGridDiv.innerHTML = '<p>No data available for chart.</p>';
                 return; // No data or axes selected, just clear the chart area
             }
 
@@ -972,16 +1070,29 @@
             console.log("updateVisualization finished");
         }
 
-        // Initial render on page load
-        window.onload = function() {
-            console.log("Window loaded. Initializing app.");
-            if (rawData && rawData.length > 0) {
-                console.log("rawData available. Rendering controls.");
-                renderControls();
-                // updateVisualization is called by updateFilterControls initially
+        // Initial render on page load using DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOMContentLoaded fired. Initializing app.");
+
+            const tsvFileInput = document.getElementById('tsvFileInput');
+            if (tsvFileInput) {
+                tsvFileInput.addEventListener('change', loadTsvFile);
             } else {
-                console.log("No rawData available.");
-                document.getElementById('dataTable').innerHTML = '<p>No data available.</p>';
+                console.error("TSV file input element not found!");
+            }
+
+            if (rawData && rawData.length > 0) {
+                console.log("Initial rawData available. Rendering controls.");
+                renderControls();
+                updateVisualization(); // Ensure visualization is updated if initial data exists
+            } else {
+                console.log("No initial rawData. Waiting for TSV file load.");
+                document.getElementById('dataTable').innerHTML = '<p>Please load a TSV file to get started.</p>';
+                // Modified: Target chartGridDiv directly instead of chartContainer
+                const chartGridDiv = document.getElementById('chartGrid');
+                if(chartGridDiv) {
+                    chartGridDiv.innerHTML = '<p>Please load a TSV file to get started.</p>';
+                }
                  // Also clear pagination controls if no data
                 const pageInfoSpan = document.getElementById('pageInfo');
                 const prevPageBtn = document.getElementById('prevPageBtn');
@@ -989,16 +1100,9 @@
                 if(pageInfoSpan) pageInfoSpan.textContent = '';
                 if(prevPageBtn) prevPageBtn.disabled = true;
                 if(nextPageBtn) nextPageBtn.disabled = true;
-
-
-                const chartContainer = document.querySelector('.chart-container');
-                if(chartContainer) {
-                     chartContainer.innerHTML = '<p>No data available.</p>';
-                }
             }
-            console.log("Window onload finished.");
-        };
-
+            console.log("DOMContentLoaded finished.");
+        });
     </script>
 
 </body>
