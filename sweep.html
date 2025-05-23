@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSPICE Sweep Table Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS for Inter font and subtle background */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom right, #ffffff, #f0f8ff); /* Subtle light blue gradient */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        /* Custom scrollbar for input container */
+        .input-container-wrapper::-webkit-scrollbar {
+            width: 8px;
+        }
+        .input-container-wrapper::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .input-container-wrapper::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .input-container-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-800">
+    <div class="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div class="bg-white p-6 sm:p-8 lg:p-10 rounded-2xl shadow-xl w-full max-w-5xl border border-blue-100 transform transition-all duration-300 hover:shadow-2xl">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-6 text-blue-600 tracking-tight">
+                HSPICE Sweep Table Generator
+            </h1>
+
+            <div class="mb-6">
+                <p class="text-lg text-gray-700 mb-4 text-center">
+                    Enter sweep parameters and check the total number of runs.
+                </p>
+                <div class="grid grid-cols-4 gap-4 text-sm sm:text-base font-semibold text-blue-700 mb-2 px-2">
+                    <span>Parameter Name</span>
+                    <span>Start Value</span>
+                    <span>End Value</span>
+                    <span>Step</span>
+                </div>
+                <div id="parameters-container" class="space-y-4 max-h-[500px] overflow-y-auto pr-2 input-container-wrapper">
+                    <div class="parameter-row grid grid-cols-4 gap-4 items-center bg-blue-50 p-3 rounded-lg shadow-sm">
+                        <input type="text" class="param-name col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., VDD">
+                        <input type="number" step="any" class="param-start col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., 0.8">
+                        <input type="number" step="any" class="param-end col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., 1.2">
+                        <input type="number" step="any" class="param-step col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., 0.1">
+                    </div>
+                </div>
+                <button id="add-parameter-btn" class="mt-4 w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-300 flex items-center justify-center shadow-md hover:shadow-lg">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    Add Parameter
+                </button>
+            </div>
+
+            <div class="mb-6 p-4 bg-blue-100 rounded-xl shadow-inner grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                <div class="flex items-center space-x-2 sm:col-span-2 sm:justify-start">
+                    <label for="unit-sim-time-value" class="text-lg font-bold text-blue-800 whitespace-nowrap">Unit Simulation Time:</label>
+                    <input type="number" id="unit-sim-time-value" class="p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 w-20 text-center" value="10" step="any">
+                    <select id="unit-sim-time-unit" class="p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200">
+                        <option value="sec">sec</option>
+                        <option value="min">min</option>
+                        <option value="hour">hour</option>
+                    </select>
+                </div>
+                <button id="generate-btn" class="w-full px-8 py-12 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 row-span-2">
+                    Generate Sweep Table
+                </button>
+                <div class="flex flex-col sm:flex-row sm:col-span-2 justify-start sm:space-x-8">
+                    <p class="text-xl font-bold text-blue-800 mb-2 sm:mb-0">
+                        Total Runs: <span id="total-runs" class="text-blue-600 text-2xl">1</span>
+                    </p>
+                    <p class="text-xl font-bold text-blue-800 mt-2 sm:mt-0">
+                        Total Simulation Time: <span id="total-sim-time" class="text-blue-600 text-2xl">10sec</span>
+                    </p>
+                </div>
+            </div>
+
+            <a id="download-link" class="hidden" download="table.sp"></a>
+
+            <div id="message-box" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+                <div class="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm w-full">
+                    <p id="message-content" class="text-lg font-semibold text-gray-800 mb-4"></p>
+                    <button id="close-message-btn" class="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition duration-300">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="w-full text-center py-4 bg-blue-50 text-blue-700 text-sm sm:text-base border-t border-blue-200">
+        Made by Sangoh Lim
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const parametersContainer = document.getElementById('parameters-container');
+            const addParameterBtn = document.getElementById('add-parameter-btn');
+            const totalRunsSpan = document.getElementById('total-runs');
+            const unitSimTimeValueInput = document.getElementById('unit-sim-time-value');
+            const unitSimTimeUnitSelect = document.getElementById('unit-sim-time-unit');
+            const totalSimTimeSpan = document.getElementById('total-sim-time');
+            const generateBtn = document.getElementById('generate-btn');
+            const downloadLink = document.getElementById('download-link');
+            const messageBox = document.getElementById('message-box');
+            const messageContent = document.getElementById('message-content');
+            const closeMessageBtn = document.getElementById('close-message-btn');
+
+            // Function to show custom message box
+            function showMessageBox(message) {
+                messageContent.textContent = message;
+                messageBox.classList.remove('hidden');
+            }
+
+            // Function to hide custom message box
+            closeMessageBtn.addEventListener('click', () => {
+                messageBox.classList.add('hidden');
+            });
+
+            // Function to create a new parameter input row
+            function createParameterRow() {
+                const row = document.createElement('div');
+                row.className = 'parameter-row grid grid-cols-4 gap-4 items-center bg-blue-50 p-3 rounded-lg shadow-sm';
+                row.innerHTML = `
+                    <input type="text" class="param-name col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., VDD">
+                    <input type="number" step="any" class="param-start col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., 0.8">
+                    <input type="number" step="any" class="param-end col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., 1.2">
+                    <input type="number" step="any" class="param-step col-span-1 p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200" placeholder="e.g., 0.1">
+                `;
+                // Add event listeners to new inputs for calculation
+                row.querySelectorAll('input').forEach(input => {
+                    input.addEventListener('input', updateRunCount);
+                });
+                return row;
+            }
+
+            // Add initial row listeners
+            parametersContainer.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', updateRunCount);
+            });
+
+            // Event listener for adding new parameter rows
+            addParameterBtn.addEventListener('click', () => {
+                parametersContainer.appendChild(createParameterRow());
+                updateRunCount(); // Recalculate after adding a new row
+            });
+
+            // Add event listeners for unit simulation time inputs
+            unitSimTimeValueInput.addEventListener('input', updateRunCount);
+            unitSimTimeUnitSelect.addEventListener('change', updateRunCount);
+
+            // Function to calculate and update total run count and total simulation time
+            function updateRunCount() {
+                let totalRuns = 1;
+                const parameterRows = document.querySelectorAll('.parameter-row');
+
+                parameterRows.forEach(row => {
+                    const startInput = row.querySelector('.param-start');
+                    const endInput = row.querySelector('.param-end');
+                    const stepInput = row.querySelector('.param-step');
+
+                    const start = parseFloat(startInput.value);
+                    const end = parseFloat(endInput.value);
+                    const step = parseFloat(stepInput.value);
+
+                    // Validate inputs
+                    if (isNaN(start) || isNaN(end) || isNaN(step)) {
+                        // If any input is not a number, consider this row as 1 run for calculation,
+                        // but show a warning if generating.
+                        return;
+                    }
+
+                    if (step === 0) {
+                        // Invalid step, treat as 1 run to avoid division by zero, but warn user.
+                        return;
+                    }
+
+                    if ((start > end && step > 0) || (start < end && step < 0)) {
+                        // Invalid range for positive step or negative step, treat as 1 run.
+                        return;
+                    }
+
+                    // Calculate runs for this row
+                    const runsInRow = Math.floor(Math.abs((end - start) / step)) + 1;
+                    totalRuns *= runsInRow;
+                });
+
+                totalRunsSpan.textContent = totalRuns;
+
+                // Calculate and update total simulation time with dynamic units
+                const unitTimeValue = parseFloat(unitSimTimeValueInput.value);
+                const unitTimeUnit = unitSimTimeUnitSelect.value;
+                let unitTimeInSeconds = 0;
+
+                if (!isNaN(unitTimeValue)) {
+                    switch (unitTimeUnit) {
+                        case 'sec':
+                            unitTimeInSeconds = unitTimeValue;
+                            break;
+                        case 'min':
+                            unitTimeInSeconds = unitTimeValue * 60;
+                            break;
+                        case 'hour':
+                            unitTimeInSeconds = unitTimeValue * 3600;
+                            break;
+                    }
+                }
+
+                const totalSimTimeInSeconds = totalRuns * unitTimeInSeconds;
+
+                let displayTime = totalSimTimeInSeconds;
+                let displayUnit = 'sec';
+
+                if (displayTime >= 86400) { // Days
+                    displayTime /= 86400;
+                    displayUnit = 'days';
+                } else if (displayTime >= 3600) { // Hours
+                    displayTime /= 3600;
+                    displayUnit = 'hours';
+                } else if (displayTime >= 60) { // Minutes
+                    displayTime /= 60;
+                    displayUnit = 'min';
+                }
+
+                // Format to 2 decimal places if not an integer
+                if (displayTime % 1 !== 0) {
+                    displayTime = displayTime.toFixed(2);
+                }
+
+                totalSimTimeSpan.textContent = `${displayTime}${displayUnit}`;
+            }
+
+            /**
+             * Generates a range of numbers from start to end with a given step.
+             * @param {number} start - The starting value.
+             * @param {number} end - The ending value.
+             * @param {number} step - The step increment/decrement.
+             * @returns {number[]} An array of numbers in the specified range.
+             */
+            function generateRange(start, end, step) {
+                const values = [];
+                // Handle floating point precision issues by using a small epsilon
+                const epsilon = 1e-9;
+
+                if (step === 0) return [start]; // Should be caught by validation, but as a safeguard
+
+                if (step > 0) {
+                    for (let i = start; i <= end + epsilon; i += step) {
+                        values.push(parseFloat(i.toFixed(9))); // To fix floating point inaccuracies
+                    }
+                } else { // step < 0
+                    for (let i = start; i >= end - epsilon; i += step) {
+                        values.push(parseFloat(i.toFixed(9))); // To fix floating point inaccuracies
+                    }
+                }
+                return values;
+            }
+
+            /**
+             * Generates all combinations from an array of arrays (Cartesian product).
+             * @param {Array<Array<any>>} arrays - An array where each element is an array of values for a parameter.
+             * @returns {Array<Array<any>>} An array of arrays, where each inner array is a combination.
+             */
+            function generateCombinations(arrays) {
+                if (arrays.length === 0) {
+                    return [[]];
+                }
+
+                let combinations = [];
+                const firstArray = arrays[0];
+                const remainingArrays = arrays.slice(1);
+
+                const subCombinations = generateCombinations(remainingArrays);
+
+                firstArray.forEach(item => {
+                    subCombinations.forEach(subCombination => {
+                        combinations.push([item, ...subCombination]);
+                    });
+                });
+
+                return combinations;
+            }
+
+            // Event listener for generating the sweep table
+            generateBtn.addEventListener('click', () => {
+                let sweepTableContent = "* HSPICE Sweep Table Generated by Sangoh Lim's Tool\n\n";
+                let allInputsValid = true;
+                const parameterData = [];
+
+                const parameterRows = document.querySelectorAll('.parameter-row');
+                if (parameterRows.length === 0) {
+                    showMessageBox('Please enter at least one sweep parameter.');
+                    return;
+                }
+
+                parameterRows.forEach((row, index) => {
+                    const nameInput = row.querySelector('.param-name');
+                    const startInput = row.querySelector('.param-start');
+                    const endInput = row.querySelector('.param-end');
+                    const stepInput = row.querySelector('.param-step');
+
+                    const name = nameInput.value.trim();
+                    const start = parseFloat(startInput.value);
+                    const end = parseFloat(endInput.value);
+                    const step = parseFloat(stepInput.value);
+
+                    if (!name) {
+                        showMessageBox(`Parameter name is empty in row #${index + 1}.`);
+                        allInputsValid = false;
+                        return;
+                    }
+                    if (isNaN(start) || isNaN(end) || isNaN(step)) {
+                        showMessageBox(`Non-numeric value entered in row #${index + 1}.`);
+                        allInputsValid = false;
+                        return;
+                    }
+                    if (step === 0) {
+                        showMessageBox(`Step value is 0 in row #${index + 1}. Step value cannot be zero.`);
+                        allInputsValid = false;
+                        return;
+                    }
+                    if ((start > end && step > 0) || (start < end && step < 0)) {
+                        showMessageBox(`Invalid start/end/step values in row #${index + 1}. Step direction must match the range.`);
+                        allInputsValid = false;
+                        return;
+                    }
+
+                    parameterData.push({ name, start, end, step });
+                });
+
+                if (!allInputsValid) {
+                    return; // Stop if any validation failed
+                }
+
+                // Generate .PARAM statements for each parameter
+                parameterData.forEach(p => {
+                    sweepTableContent += `.PARAM ${p.name} = ${p.start}\n`; // Initial value for .PARAM
+                });
+                sweepTableContent += "\n";
+
+                // Collect parameter names and their ranges
+                const parameterNames = parameterData.map(p => p.name);
+                const parameterRanges = parameterData.map(p => generateRange(p.start, p.end, p.step));
+
+                // Generate all combinations
+                const allCombinations = generateCombinations(parameterRanges);
+
+                // Construct the .DATA block
+                sweepTableContent += `.DATA sweep_table\t${parameterNames.join('\t')}\n`;
+
+                allCombinations.forEach(combination => {
+                    sweepTableContent += `+ ${combination.join('\t')}\n`;
+                });
+
+                sweepTableContent += `.enddata\n`;
+                sweepTableContent += "\n* Add your simulation commands here (e.g., .DC, .TRAN, .MEASURE)\n";
+                sweepTableContent += "* Example: .DC VDD 0.8 1.2 0.1\n";
+                sweepTableContent += "* Example: .MEASURE TRAN VOUT_MAX MAX V(out)\n";
+
+
+                // Create a Blob and trigger download
+                const blob = new Blob([sweepTableContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.click();
+                URL.revokeObjectURL(url); // Clean up the URL object
+
+                showMessageBox('table.sp file successfully generated!');
+            });
+
+            // Initial calculation on load
+            updateRunCount();
+        });
+    </script>
+</body>
+</html>
